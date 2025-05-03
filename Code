@@ -1,0 +1,165 @@
+import tkinter as tk
+import time
+import threading
+from pystray import Icon, Menu, MenuItem
+from PIL import Image, ImageDraw
+import finnhub
+
+# Initialize Finnhub client with your API key
+finnhub_client = finnhub.Client(api_key="d0akajpr01qm3l9m2lf0d0akajpr01qm3l9m2lfg")
+
+def get_prices(tickers):
+    """Fetch stock prices and daily changes from Finnhub.io."""
+    prices = {}
+    for symbol in tickers:
+        try:
+            # Fetch the current price and daily change using Finnhub
+            quote = finnhub_client.quote(symbol)
+            current_price = round(quote['c'], 2)  # 'c' is the current price
+            daily_change = round(quote['d'], 2)  # 'd' is the daily change
+            change_sign = "+" if daily_change > 0 else ""  # Add "+" for positive changes
+            prices[symbol] = f"${current_price} ({change_sign}{daily_change})"
+        except Exception as e:
+            prices[symbol] = f"Error: {e}"
+    return prices
+
+class TickerTapeApp:
+    def __init__(self, root, tickers):
+        self.root = root
+        self.tickers = tickers
+        self.prices = get_prices(tickers)
+        self.ticker_text = self.build_ticker_text()
+        
+        # Get screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set the app width to the screen width and position it just above the taskbar
+        app_height = 50  # Height of the ticker tape
+        self.root.geometry(f"{screen_width}x{app_height}+0+{screen_height - app_height - 40}")  # 40px offset for taskbar
+        self.root.overrideredirect(True)  # Remove window decorations (title bar, etc.)
+        self.root.attributes("-topmost", True)  # Keep the app always on top
+
+        # Create a canvas for smooth scrolling
+        self.canvas = tk.Canvas(root, height=app_height, bg="Light Blue", highlightthickness=0)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Duplicate the ticker text dynamically to fill the screen width
+        self.text_id = self.canvas.create_text(0, 15, text=self.duplicate_ticker_text(), font=("FixedSys", 20), fill="white", anchor="w")
+        
+        self.scroll_speed = 10  # Milliseconds between updates
+        self.text_width = None
+        self.canvas_width = None
+        self.pos = 0  # Start position (off-screen to the right)
+        self.root.after(100, self.initialize_dimensions)  # Delay initialization
+
+    def initialize_dimensions(self):
+        """Initialize dimensions after the canvas is rendered."""
+        self.text_width = self.canvas.bbox(self.text_id)[2]  # Get the width of the text
+        self.canvas_width = self.canvas.winfo_width()
+        self.pos = 0  # Start position at the far left of the canvas
+        self.canvas.coords(self.text_id, self.pos, 25)  # Set text position to the far left
+        self.update_ticker()
+        self.refresh_prices()
+
+    def build_ticker_text(self):
+        """Build the ticker text with updated prices and daily changes."""
+        ticker_text = "    ".join([f"{symbol}: {self.prices.get(symbol, 'N/A')}" for symbol in self.tickers])
+        ticker_text += " " * 10  # Add some padding at the end
+        return ticker_text
+
+    def duplicate_ticker_text(self):
+        """Duplicate the ticker text dynamically to fill the screen width."""
+        base_text = self.build_ticker_text()
+        # Estimate how many times the text needs to be repeated to fill the screen
+        repetitions = (self.root.winfo_screenwidth() // len(base_text)) + 2
+        return (base_text + " ") * repetitions
+
+    def update_ticker(self):
+        """Scroll the ticker text smoothly."""
+        self.canvas.move(self.text_id, -2, 0)  # Move text 2 pixels to the left
+        self.pos -= 2
+        if self.pos + self.text_width < 0:  # If the text is completely off-screen
+            self.pos = self.canvas_width  # Reset position to the far right
+            self.canvas.coords(self.text_id, self.pos, 25)  # Reset text position
+        self.root.after(self.scroll_speed, self.update_ticker)
+
+    def refresh_prices(self):
+        """Refresh prices dynamically without interrupting the scrolling."""
+        new_prices = get_prices(self.tickers)
+        self.prices.update(new_prices)  # Update the prices dictionary
+        new_ticker_text = self.duplicate_ticker_text()
+        # Update the text with the new prices and duplicate it for seamless scrolling
+        self.canvas.itemconfig(self.text_id, text=new_ticker_text)
+        self.text_width = self.canvas.bbox(self.text_id)[2]  # Update text width
+        self.root.after(60000, self.refresh_prices)  # Refresh every 60 seconds
+
+def show_ticker_tape():
+    """Show the ticker tape app."""
+    tickers = ticker_entry.get().strip().upper().split(",")
+    if tickers:
+        ticker_window = tk.Toplevel()
+        ticker_window.title("Ticker Tape")
+        ticker_window.overrideredirect(True)  # Remove window decorations
+        ticker_window.attributes("-topmost", True)  # Keep on top
+        TickerTapeApp(ticker_window, tickers)
+
+def show_input_window():
+    """Show the input window."""
+    root.deiconify()
+
+def hide_input_window():
+    """Hide the input window."""
+    root.withdraw()
+
+def quit_program(icon, item):
+    """Quit the program gracefully."""
+    icon.stop()
+    root.destroy()
+
+def create_tray_icon():
+    """Create a system tray icon."""
+    # Create an icon image
+    image = Image.new("RGB", (64, 64), color="black")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((16, 16, 48, 48), fill="white")
+
+    # Create the tray icon menu
+    menu = Menu(
+        MenuItem("Show Input Window", lambda: show_input_window()),
+        MenuItem("Hide Input Window", lambda: hide_input_window()),
+        MenuItem("Quit", lambda: quit_program(icon, None))
+    )
+
+    # Create and run the tray icon
+    global icon
+    icon = Icon("TickerTape", image, "Ticker Tape", menu)
+    icon.run()
+
+def main():
+    global root
+    root = tk.Tk()
+    root.configure(bg="black")
+    root.title("Ticker Input")
+    root.geometry("350x100"),
+    root.resizable(False, False)  # Prevent resizing
+    root.withdraw()  # Start with the window hidden
+    
+
+
+    # Add input field and buttons
+    tk.Label(root, text="Enter stock tickers (comma-separated):", bg="black", fg="white", font='fixedsys').pack(pady=10)
+    global ticker_entry
+    ticker_entry = tk.Entry(root, width=30)
+    ticker_entry.pack(pady=5)
+    tk.Button(root, text="Start Ticker Tape", command=show_ticker_tape, bg='black', fg='white',font='fixedsys').pack(pady=5)
+    tk.Button(root, text="X",font='fixedsys', command=lambda: quit_program(icon, None)).pack(pady=5)  # Add an X button to quit the program
+
+    # Run the tray icon in a separate thread
+    tray_thread = threading.Thread(target=create_tray_icon, daemon=True)
+    tray_thread.start()
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
