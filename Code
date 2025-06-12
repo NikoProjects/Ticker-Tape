@@ -40,8 +40,8 @@ class TickerTapeApp:
         self.root.overrideredirect(True)  # Remove window decorations (title bar, etc.)
         self.root.attributes("-topmost", True)  # Keep the app always on top
 
-        # Create a canvas for smooth scrolling
-        self.canvas = tk.Canvas(root, height=app_height, bg="Light Blue", highlightthickness=0)
+        # Create a canvas with the transparent background
+        self.canvas = tk.Canvas(root, height=app_height, bg="magenta", highlightthickness=0, bd=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         
         # Duplicate the ticker text dynamically to fill the screen width
@@ -94,14 +94,37 @@ class TickerTapeApp:
         self.text_width = self.canvas.bbox(self.text_id)[2]  # Update text width
         self.root.after(60000, self.refresh_prices)  # Refresh every 60 seconds
 
+TICKERS_FILE = "tickers.txt"
+
+def save_tickers(tickers):
+    """Save tickers to a text file."""
+    with open(TICKERS_FILE, "w") as f:
+        f.write(",".join(tickers))
+
+def load_tickers():
+    """Load tickers from a text file."""
+    try:
+        with open(TICKERS_FILE, "r") as f:
+            return f.read().strip().upper().split(",")
+    except FileNotFoundError:
+        return []
+
 def show_ticker_tape():
     """Show the ticker tape app."""
     tickers = ticker_entry.get().strip().upper().split(",")
+    tickers = [t.strip() for t in tickers if t.strip()]
     if tickers:
+        save_tickers(tickers)  # Save tickers to file
         ticker_window = tk.Toplevel()
         ticker_window.title("Ticker Tape")
         ticker_window.overrideredirect(True)  # Remove window decorations
         ticker_window.attributes("-topmost", True)  # Keep on top
+
+        # Set a unique background color for transparency
+        transparent_color = "magenta"
+        ticker_window.configure(bg=transparent_color)
+        ticker_window.wm_attributes("-transparentcolor", transparent_color)
+
         TickerTapeApp(ticker_window, tickers)
 
 def show_input_window():
@@ -144,14 +167,19 @@ def main():
     root.geometry("350x100"),
     root.resizable(False, False)  # Prevent resizing
     root.withdraw()  # Start with the window hidden
-    
-
+    root.attributes("-alpha", 0.85)  # Set opacity to 85%
 
     # Add input field and buttons
     tk.Label(root, text="Enter stock tickers (comma-separated):", bg="black", fg="white", font='fixedsys').pack(pady=10)
     global ticker_entry
     ticker_entry = tk.Entry(root, width=30)
     ticker_entry.pack(pady=5)
+
+    # Load tickers from file and set in entry
+    loaded_tickers = load_tickers()
+    if loaded_tickers:
+        ticker_entry.insert(0, ",".join(loaded_tickers))
+
     tk.Button(root, text="Start Ticker Tape", command=show_ticker_tape, bg='black', fg='white',font='fixedsys').pack(pady=5)
     tk.Button(root, text="X",font='fixedsys', command=lambda: quit_program(icon, None)).pack(pady=5)  # Add an X button to quit the program
 
