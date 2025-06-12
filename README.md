@@ -1,1 +1,1 @@
-# Just a simple ticker take pulling stock prices from an api and displaying on your screen.
+# Just a simple ticker take pulling stock prices from an api and displaying on your screen. The program is really janky just because im very new to coding, but it is functional. You need to create your own finnhub api key on their website but its free.
