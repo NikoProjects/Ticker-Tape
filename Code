@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 import finnhub
 
 # Initialize Finnhub client with your API key
-finnhub_client = finnhub.Client(api_key="d0akajpr01qm3l9m2lf0d0akajpr01qm3l9m2lfg")
+finnhub_client = finnhub.Client(api_key="YOUR_FINNHUB_APIKEY")
 
 def get_prices(tickers):
     """Fetch stock prices and daily changes from Finnhub.io."""
